@@ -27,8 +27,19 @@ async function run() {
         await client.connect();
 
         const mainCollection = client.db("fashionCamp").collection("mainData")
+        const usersCollection = client.db("fashionCamp").collection("users")
         const cartCollection = client.db("fashionCamp").collection("carts")
 
+
+        // user releted apis 
+        app.post('/users', async(req, res) => {
+            const user = req.body;
+            const result = await usersCollection.insertOne(user);
+            res.send(result)
+        })
+
+
+        //main data to get class and instructors
         app.get('/mainData', async (req, res) => {
             const result = await mainCollection.find().toArray();
             res.send(result)
