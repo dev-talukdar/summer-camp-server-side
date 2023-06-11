@@ -26,26 +26,33 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
 
-
         const mainCollection = client.db("fashionCamp").collection("mainData")
         const cartCollection = client.db("fashionCamp").collection("carts")
 
-
-        app.get('/mainData', async(req, res) => {
+        app.get('/mainData', async (req, res) => {
             const result = await mainCollection.find().toArray();
             res.send(result)
         })
 
-        // carts collection started here 
-        app.post('/carts', async(req, res) => {
-            const pclass = req.body;
+        // carts collection api started here  
+        app.get('/carts', async(req, res) => {
+            const email = req.query.email;
+            console.log(email)
+            if(!email){
+                res.send([])
+            }
+            const query = {email: email};
+            const result = await cartCollection.find(query).toArray();
+            res.send(result);
+        });
+
+
+        app.post('/carts', async (req, res) => {
+            const pclass = req.body
             console.log(pclass);
-            const result = await cartCollection.insertOne(pclass);
-            res.send(result)
+            const result = await cartCollection.insertOne(pclass)
+            res.send(result);
         })
-
-
-
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
