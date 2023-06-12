@@ -1,10 +1,11 @@
 const express = require('express')
 const app = express()
 const cors = require('cors');
+const jwt = require('jsonwebtoken')
 require('dotenv').config();
 const port = process.env.PORT || 5000;
 
-// middleware
+// middleware 
 app.use(cors());
 app.use(express.json())
 
@@ -29,6 +30,13 @@ async function run() {
         const mainCollection = client.db("fashionCamp").collection("mainData")
         const usersCollection = client.db("fashionCamp").collection("users")
         const cartCollection = client.db("fashionCamp").collection("carts")
+
+
+        // jwt token generate
+        app.post('/jwt', (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, env.process.ACCESS_TOKEN_SECRET, {expiresIn: '1h'})
+        })
 
 
         // user releted apis 
