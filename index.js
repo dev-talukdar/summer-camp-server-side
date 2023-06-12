@@ -76,6 +76,24 @@ async function run() {
             res.send(result)
         });
 
+        // security layer: verifyJWT
+        // email same 
+        // check admin
+        
+        app.get('/users/admin/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+
+            if (req.decoded.email !== email) {
+                res.send({ admin: false })
+            }
+
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            const result = { admin: user?.role === 'admin' }
+            res.send(result)
+        })
+
+
         app.patch('/users/admin/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
@@ -108,12 +126,18 @@ async function run() {
         })
 
         // carts collection api started here  
-        app.get('/carts', async (req, res) => {
+        app.get('/carts', verifyJWT, async (req, res) => {
             const email = req.query.email;
             // console.log(email)
             if (!email) {
                 res.send([])
             }
+
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                return res.status(403).send({ error: true, message: 'forbidden access' })
+            }
+
             const query = { email: email };
             const result = await cartCollection.find(query).toArray();
             res.send(result);
