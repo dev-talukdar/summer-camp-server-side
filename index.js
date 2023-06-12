@@ -76,10 +76,11 @@ async function run() {
             res.send(result)
         });
 
+        // Trying to get Admin
         // security layer: verifyJWT
         // email same 
         // check admin
-        
+
         app.get('/users/admin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
 
@@ -103,6 +104,24 @@ async function run() {
                 },
             }
             const result = await usersCollection.updateOne(filter, updateDoc);
+            res.send(result)
+        })
+
+        // Trying to get instructor
+        // security layer: verifyJWT
+        // email same 
+        // check admin
+
+        app.get('/users/instructor/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+
+            if (req.decoded.email !== email) {
+                res.send({ instructor: false })
+            }
+
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            const result = { instructor: user?.role === 'instructor' }
             res.send(result)
         })
 
