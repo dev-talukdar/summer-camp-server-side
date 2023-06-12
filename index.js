@@ -3,6 +3,7 @@ const app = express()
 const cors = require('cors');
 const jwt = require('jsonwebtoken')
 require('dotenv').config();
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
 // middleware 
@@ -27,9 +28,18 @@ const verifyJWT = (req, res, next) => {
     })
 }
 
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    next();
+});
+
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ij7qzua.mongodb.net/?retryWrites=true&w=majority`;
+// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ij7qzua.mongodb.net/?retryWrites=true&w=majority`;
+ const uri = `mongodb://${process.env.DB_USER}:${process.env.DB_PASS}@ac-jrvspzb-shard-00-00.ij7qzua.mongodb.net:27017,ac-jrvspzb-shard-00-01.ij7qzua.mongodb.net:27017,ac-jrvspzb-shard-00-02.ij7qzua.mongodb.net:27017/?ssl=true&replicaSet=atlas-jvs1i2-shard-0&authSource=admin&retryWrites=true&w=majority`
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -43,11 +53,12 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+         
 
         const mainCollection = client.db("fashionCamp").collection("mainData")
         const usersCollection = client.db("fashionCamp").collection("users")
         const cartCollection = client.db("fashionCamp").collection("carts")
+        const paymentCollection = client.db("fashionCamp").collection("payments")
 
 
         // jwt token generate
@@ -57,9 +68,32 @@ async function run() {
             res.send({ token })
         })
 
+        //verify Admin
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email }
+            const user = await usersCollection.findOne(query);
+            if (user?.role !== 'admin') {
+                return res.status(403).send({ error: true, message: 'forbidden message' })
+            }
+            next()
+        }
+
+        //TODO instructor verification remaining
+        //verify Instructor
+        //  const verifyInstructor = async (req, res, next) => {
+        //     const email = req.decoded.email;
+        //     const query = { email: email }
+        //     const user = await usersCollection.findOne(query);
+        //     if (user?.role !== 'instructor') {
+        //         return res.status(403).send({ error: true, message: 'forbidden message' })
+        //     }
+        //     next()
+        // }
+
 
         // user releted apis 
-        app.get('/users', async (req, res) => {
+        app.get('/users', verifyJWT, verifyAdmin, async (req, res) => {
             const result = await usersCollection.find().toArray()
             res.send(result)
         });
@@ -144,6 +178,12 @@ async function run() {
             res.send(result)
         })
 
+        app.post('/mainData', async (req, res) => {
+            const newClass = req.body;
+            const result = await mainCollection.insertOne(newClass);
+            res.send(result)
+        })
+
         // carts collection api started here  
         app.get('/carts', verifyJWT, async (req, res) => {
             const email = req.query.email;
@@ -177,6 +217,33 @@ async function run() {
             res.send(result)
         })
 
+        //create payment intent
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+            const { price } = req.body;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+              amount: amount,
+              currency: 'usd',
+              payment_method_types: ['card']
+            });
+      
+            res.send({
+              clientSecret: paymentIntent.client_secret 
+            })
+          })
+      
+          // payment releted api
+      
+          app.post('/payments', verifyJWT, async (req, res) => {
+            const payment = req.body;
+            const insertResult = await paymentCollection.insertOne(payment)
+      
+            const query = { _id: { $in: payment.cartProducts.map(id => new ObjectId(id)) } }
+            const deleteResult = await cartCollection.deleteMany(query)
+      
+            res.send({ insertResult, deleteResult })
+          })
+
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
@@ -185,7 +252,7 @@ async function run() {
         // await client.close();
     }
 }
-run().catch(console.dir);
+run().catch(console.dir); 
 
 
 app.get('/', (req, res) => {
